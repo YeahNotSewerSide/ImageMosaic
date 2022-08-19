@@ -77,7 +77,6 @@ pub fn build_mosaic(
         tree.add(color, index)?;
     }
 
-
     for (x, y, pixel) in source.pixels() {
         let pxl = [pixel.0[0] as f64, pixel.0[1] as f64, pixel.0[2] as f64];
 
@@ -99,11 +98,10 @@ pub fn build_mosaic(
 
         for (ximage, xtile) in (x_offset_start..x_offset_end).zip(0..kernel_size.0) {
             for (yimage, ytile) in (y_offset_start..y_offset_end).zip(0..kernel_size.1) {
-                let tile_pixel = nearest_tile.get_pixel(xtile, ytile);
+                let tile_pixel = unsafe { nearest_tile.unsafe_get_pixel(xtile, ytile) };
                 unsafe { to_return.unsafe_put_pixel(ximage, yimage, tile_pixel) };
             }
         }
-
     }
 
     Ok(to_return)
@@ -121,15 +119,14 @@ pub fn build_mosaic_without_compression(
 
     let mut to_return = DynamicImage::new_rgb8(new_width, new_height);
 
-    let mut tree: kdtree::KdTree<f64, usize, [f64; 3]> = kdtree::KdTree::with_capacity(3, tiles.len());
-
+    let mut tree: kdtree::KdTree<f64, usize, [f64; 3]> =
+        kdtree::KdTree::with_capacity(3, tiles.len());
 
     for (index, tile) in tiles.iter().enumerate() {
         let color = mean_color(tile);
 
         tree.add(color, index)?;
     }
-
 
     for (x, y, pixel) in source.pixels() {
         let pxl = [pixel.0[0] as f64, pixel.0[1] as f64, pixel.0[2] as f64];
@@ -156,7 +153,6 @@ pub fn build_mosaic_without_compression(
                 unsafe { to_return.unsafe_put_pixel(ximage, yimage, tile_pixel) };
             }
         }
-        
     }
 
     Ok(to_return)

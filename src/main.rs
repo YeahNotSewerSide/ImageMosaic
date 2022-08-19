@@ -20,7 +20,7 @@ struct Args {
     height: u32,
 
     #[clap(short, long, value_parser)]
-    resize: bool
+    resize: bool,
 }
 
 fn main() {
@@ -30,10 +30,9 @@ fn main() {
 
     let tiles = mosaic::prepare_tiles(&args.tiles, kernel_size).unwrap();
 
-
-    let image = if args.resize{
+    let image = if args.resize {
         mosaic::build_mosaic(&args.source, &tiles, kernel_size).unwrap()
-    }else{
+    } else {
         mosaic::build_mosaic_without_compression(&args.source, &tiles, kernel_size).unwrap()
     };
 
