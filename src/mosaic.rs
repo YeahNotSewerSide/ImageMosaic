@@ -96,6 +96,7 @@ pub fn build_mosaic(
             y_offset_end = to_return.height();
         }
 
+        // copy tile to image
         for (ximage, xtile) in (x_offset_start..x_offset_end).zip(0..kernel_size.0) {
             for (yimage, ytile) in (y_offset_start..y_offset_end).zip(0..kernel_size.1) {
                 let tile_pixel = unsafe { nearest_tile.unsafe_get_pixel(xtile, ytile) };
@@ -147,13 +148,107 @@ pub fn build_mosaic_without_compression(
             y_offset_end = to_return.height();
         }
 
+        // copy tile to image
         for (ximage, xtile) in (x_offset_start..x_offset_end).zip(0..kernel_size.0) {
             for (yimage, ytile) in (y_offset_start..y_offset_end).zip(0..kernel_size.1) {
-                let tile_pixel = nearest_tile.get_pixel(xtile, ytile);
+                let tile_pixel = unsafe{ nearest_tile.unsafe_get_pixel(xtile, ytile) };
                 unsafe { to_return.unsafe_put_pixel(ximage, yimage, tile_pixel) };
             }
         }
     }
 
     Ok(to_return)
+}
+
+
+// /// opacity should be less than 255
+// macro_rules! blend {
+//     ($src:expr, $pxl:expr, $opacity:expr) => {
+//         image::Rgba::<u8>([
+//             $pxl.0[0]/(255-$opacity) + $src.0[0]/$opacity,
+//             $pxl.0[1]/(255-$opacity) + $src.0[1]/$opacity,
+//             $pxl.0[2]/(255-$opacity) + $src.0[2]/$opacity,
+//             255
+//         ])
+//     };
+// }
+
+pub fn blend(
+    src_pxl:image::Rgba<u8>, 
+    pxl:image::Rgba<u8>, 
+    opacity:u8
+) -> image::Rgba<u8>{
+    let pxl_opacity = (opacity as f64) / 255f64;
+    let src_opacity = 1f64 - pxl_opacity;
+    let res_opacity = 1f64 - (1f64 - pxl_opacity)*(1f64-src_opacity); 
+    
+    let r = ((pxl.0[0]as f64)/255f64)*pxl_opacity + ((src_pxl.0[0]as f64)/255f64)*src_opacity*(1f64-pxl_opacity);
+    let g = ((pxl.0[1]as f64)/255f64)*pxl_opacity + ((src_pxl.0[1]as f64)/255f64)*src_opacity*(1f64-pxl_opacity);
+    let b = ((pxl.0[2]as f64)/255f64)*pxl_opacity + ((src_pxl.0[2]as f64)/255f64)*src_opacity*(1f64-pxl_opacity);
+
+    image::Rgba::<u8>([
+        (r*255f64) as u8,
+        (g*255f64) as u8,
+        (b*255f64) as u8,
+        (res_opacity*255f64) as u8
+    ])
+
+}
+
+pub fn build_mosaic_blend(
+    src_image: &str,
+    tiles: &[DynamicImage],
+    kernel_size: (u32, u32),
+    opacity:u8,
+) -> ResultSmall<DynamicImage> {
+
+    let mut source = ImageReader::open(src_image)?.decode()?;
+
+    let new_width = (source.width() as f64 / kernel_size.0 as f64).round() as u32;
+    let new_height = (source.height() as f64 / kernel_size.1 as f64).round() as u32;
+
+    let source_resized = source.resize_exact(new_width, new_height, FilterType::Nearest);
+
+    let mut tree: kdtree::KdTree<f64, usize, [f64; 3]> = kdtree::KdTree::with_capacity(3, tiles.len());
+
+    for (index, tile) in tiles.iter().enumerate() {
+        let color = mean_color(tile);
+
+        tree.add(color, index)?;
+    }
+
+
+    for (x, y, pixel) in source_resized.pixels() {
+        let pxl = [pixel.0[0] as f64, pixel.0[1] as f64, pixel.0[2] as f64];
+
+        let nearest = tree.nearest(&pxl, 1, &squared_euclidean)?;
+        let nearest_tile = &tiles[*nearest[0].1];
+
+        let x_offset_start = x * kernel_size.0;
+        let y_offset_start = y * kernel_size.1;
+
+        let mut x_offset_end = x_offset_start + kernel_size.0;
+        let mut y_offset_end = y_offset_start + kernel_size.1;
+
+        if x_offset_end > source.width() {
+            x_offset_end = source.width();
+        }
+        if y_offset_end > source.height() {
+            y_offset_end = source.height();
+        }
+
+        // copy tile to image
+        for (ximage, xtile) in (x_offset_start..x_offset_end).zip(0..kernel_size.0) {
+            for (yimage, ytile) in (y_offset_start..y_offset_end).zip(0..kernel_size.1) {
+                let tile_pixel = unsafe { nearest_tile.unsafe_get_pixel(xtile, ytile) };
+                let src_pixel = unsafe{ source.unsafe_get_pixel(ximage, yimage) };
+                
+                let new_pxl = blend(src_pixel,tile_pixel,opacity);
+                unsafe { source.unsafe_put_pixel(ximage, yimage, new_pxl) };
+            }
+        }
+    }
+
+
+    Ok(source)
 }
