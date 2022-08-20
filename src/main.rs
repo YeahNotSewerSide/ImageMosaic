@@ -27,7 +27,7 @@ struct Args {
     height: u32,
 
     #[clap(short, long, value_parser)]
-    /// With a resize on new image will be the size of (source.width*width, source.height*height)
+    /// With a resize on, new image will be the size of (source.width*width, source.height*height)
     resize: bool,
 
     #[clap(short, long, value_parser)]
