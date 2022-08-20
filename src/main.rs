@@ -30,7 +30,7 @@ struct Args {
     /// With a resize on, new image will be the size of (source.width*width, source.height*height)
     resize: bool,
 
-    #[clap(short, long, value_parser)]
+    #[clap(long, value_parser)]
     /// Desired opacity of tiles, 0 - min, 255 - max
     opacity: Option<u8>
 }
