@@ -40,8 +40,13 @@ fn main() {
 
     let kernel_size = (args.width, args.height);
 
+    println!("Loading tiles from {}...",args.tiles);
+
     let tiles = mosaic::prepare_tiles(&args.tiles, kernel_size).unwrap();
 
+    println!("Loaded {} tiles",tiles.len());
+
+    println!("Generating mosaic...");
     let image = if !args.resize {
         match args.opacity{
             Some(opacity) => {
@@ -59,5 +64,6 @@ fn main() {
         mosaic::build_mosaic_without_compression(&args.source, &tiles, kernel_size).unwrap()
     };
 
+    println!("Saving resulting image {}",args.output);
     image.save(args.output).unwrap();
 }
